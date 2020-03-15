@@ -3,6 +3,7 @@ from sklearn.metrics import r2_score, explained_variance_score
 # plotting
 import matplotlib.pyplot as plt
 from data_preprocessing import *
+import seaborn as sns
 from keras import layers, backend
 
 # get the predicted value of Y using fitted model
