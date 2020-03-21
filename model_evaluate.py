@@ -1,9 +1,23 @@
 # metrics
-from sklearn.metrics import r2_score, explained_variance_score
+# from sklearn.metrics import r2_score, explained_variance_score
 # plotting
 import matplotlib.pyplot as plt
 from data_preprocessing import *
+import seaborn as sns
 from keras import layers, backend
+
+# mean squared error
+def mse(true, predict):
+    return np.mean((true - predict)**2)
+
+# mean absolute error
+def mae(true, predict):
+    return np.mean(np.abs(true - predict))
+
+# r_2 score
+def r2score(true, predict):
+    return 1 - np.sum((true - predict)**2)/np.sum((true - np.mean(true))**2)
+
 
 # get the predicted value of Y using fitted model
 # Input: fitted model, X_test, Y_test, PCA(should the output be reconstructed from pca), std(similar to pca)
@@ -28,12 +42,6 @@ def modelPredict(model, X_test, pca=False, standardized=False,
     cache = {"Y_predicted_pca":Y_predicted}
     return Y_reconstruct, cache
 
-def clippingYPredict(Y_predict):
-    Y_clipped = Y_predict
-    Y_clipped[Y_clipped<0]=0
-    return Y_clipped
-
-
 # Analyze the model's accuracy using Y_true and Y_predict,
 # when they are of the shape (N, 4124).
 # Input: Y_true, Y_predict, verbose=True
@@ -46,8 +54,8 @@ def modelAnalysis(Y_true, Y_predict, verbose=True):
         for i in range(Y_true.shape[0]):
             r2_record[i] = r2_score(Y_true[i, :], Y_predict[i, :])
         r2_avg = round(np.mean(r2_record), 4)
-    rmse = np.sqrt(mean_squared_error(Y_true, Y_predict))
-    mae = mean_absolute_error(Y_true, Y_predict)
+    rmse = np.sqrt(mse(Y_true, Y_predict))
+    mae1 = mae(Y_true, Y_predict)
     if Y_true.ndim == 2:
         mre = np.mean(np.abs(Y_true - Y_predict) / np.max(Y_true, axis=1, keepdims=True))
     else:
@@ -56,16 +64,11 @@ def modelAnalysis(Y_true, Y_predict, verbose=True):
         if Y_true.ndim == 2:
             print("r2_score_avg is ", r2_avg)
         print("root mean squared error is ", rmse)
-        print("mean absolute error is ",mae)
+        print("mean absolute error is ",mae1)
         print("mean relative error is ",mre)
     if Y_true.ndim == 2:
-        return {"r2": r2_avg,
-                "rmse": rmse,
-                "mae": mae,
-                "mre": mre}
-    return {"rmse":rmse,
-            "mae":mae,
-            "mre":mre}
+        return r2_avg,rmse,mae1,mre
+    return rmse,mae,mre
 
 # calculate loss manually
 def getLossManual(loss):
@@ -76,7 +79,7 @@ def getLossManual(loss):
 
 # analyze the first component
 def analyzeFirstComponent(Y_first, Y_first_pred):
-    mae = np.mean(mean_absolute_error(Y_first, Y_first_pred))
+    mae = np.mean(mae(Y_first, Y_first_pred))
     print("mae is: ", mae)
     plt.scatter(np.arange(len(Y_first)), Y_first, c='blue', s=0.5)
     plt.scatter(np.arange(len(Y_first_pred)), Y_first_pred, c='red', s=0.5)
@@ -84,6 +87,7 @@ def analyzeFirstComponent(Y_first, Y_first_pred):
     return mae
 
 # some graphs
+# Plot y_predict against y_true (4124 element from 1 sample)
 def yHatYPlot(Y_true, Y_predict, title = 'y, y_hat plot',sampleIndex=0):
     plt.scatter(Y_true[sampleIndex,:], Y_predict[sampleIndex,:], s=0.1)
     max_range = np.max([np.max(Y_true[sampleIndex,:]), np.max(Y_predict[sampleIndex,:])])
@@ -94,6 +98,7 @@ def yHatYPlot(Y_true, Y_predict, title = 'y, y_hat plot',sampleIndex=0):
     plt.xlabel('KTH MPS')
     plt.show()
 
+# plot all y_predict against y_true (for one point predictions)
 def wholeYHatY(Y_true, Y_predict, title = 'Y, Y_hat plot'):
     plt.scatter(Y_true, Y_predict, s=0.5)
     max_range = np.max([np.max(Y_true), np.max(Y_predict)])
@@ -104,6 +109,7 @@ def wholeYHatY(Y_true, Y_predict, title = 'Y, Y_hat plot'):
     plt.xlabel('KTH MPS')
     plt.show()
 
+# plot the y values against index
 def testPredictPlot(Y_true, Y_predict, title = 'y, y_pred plot',sampleIndex=0):
     plt.scatter(np.arange(Y_true.shape[1]), Y_true[sampleIndex,:], s=0.1, c='blue', label="KTH MPS")
     plt.scatter(np.arange(Y_predict.shape[1]), Y_predict[sampleIndex,:], s=0.1, c='red', label="Predicted MPS")
@@ -113,6 +119,7 @@ def testPredictPlot(Y_true, Y_predict, title = 'y, y_pred plot',sampleIndex=0):
     plt.xlabel('Index')
     plt.show()
 
+# residual plot
 def residualGraph(Y_true, Y_predict, title = 'Residual plot', sampleIndex=0):
     plt.scatter(np.arange(4124),Y_predict[sampleIndex,:]-Y_true[sampleIndex,:], s=0.1)
     plt.title(title+' of sample '+str(sampleIndex))
@@ -120,6 +127,7 @@ def residualGraph(Y_true, Y_predict, title = 'Residual plot', sampleIndex=0):
     plt.xlabel('index')
     plt.show()
 
+# residual histogram
 def residualHist(Y_true, Y_predict, title = "Residual histogram", abs=True):
     Y_predict_flatten = Y_predict.reshape(Y_predict.shape[0]*Y_predict.shape[1])
     Y_true_flatten = Y_true.reshape(Y_true.shape[0]*Y_true.shape[1])
@@ -133,6 +141,7 @@ def residualHist(Y_true, Y_predict, title = "Residual histogram", abs=True):
     plt.ylabel("fraction of all brain element")
     plt.show()
 
+# relative residual against index
 def relativeResidualGraph(Y_true, Y_predict, title = 'Relative Residual plot', sampleIndex=0):
     plt.scatter(np.arange(4124),(Y_predict[sampleIndex,:]-Y_true[sampleIndex,:])/np.max(Y_true[sampleIndex,:]), s=0.1)
     plt.title(title+' of sample '+str(sampleIndex))
@@ -140,6 +149,8 @@ def relativeResidualGraph(Y_true, Y_predict, title = 'Relative Residual plot', s
     plt.xlabel('index')
     plt.show()
 
+# if p=True, then this function would plot 5 sample of residual analysis plots
+# for model evaluation
 def plot(Y_test, Y_predict, p=True):
     if p:
         residualHist(Y_test, Y_predict)
